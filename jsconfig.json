@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./web-app/src/*"]
+    }
+  },
+  "exclude": ["web-app/node_modules", "web-app/dist"],
+  "include": [
+    "./web-app/src/**/*"
+  ]
+}
