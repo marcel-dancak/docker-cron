@@ -1,7 +1,6 @@
 package dcron
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -19,7 +18,6 @@ type Server struct {
 	router      *chi.Mux
 	taskManager *TaskManager
 	upgrader    websocket.Upgrader
-	wsConns     map[*websocket.Conn]bool
 	hub         *Hub
 }
 
@@ -40,28 +38,6 @@ func (s *Server) jsonResponse(w http.ResponseWriter, data interface{}) {
 }
 
 func (s *Server) handleWs(w http.ResponseWriter, r *http.Request) {
-	conn, err := s.upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		http.Error(w, "WS connection failed", http.StatusInternalServerError)
-		return
-	}
-	s.wsConns[conn] = true
-	for {
-		msgType, msg, err := conn.ReadMessage()
-		if err != nil {
-			log.Println(err)
-			break
-		}
-		if bytes.Compare(msg, []byte("Ping")) == 0 {
-			continue
-		}
-		log.Println(msgType, string(msg))
-	}
-	delete(s.wsConns, conn)
-}
-
-func (s *Server) handleWs2(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
@@ -139,14 +115,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-// func (s *Server) broadcastJSON(data interface{}) {
-// 	for conn := range s.wsConns {
-// 		if err := conn.WriteJSON(data); err != nil {
-// 			log.Printf("Failed to send JSON message: %s\n", err)
-// 		}
-// 	}
-// }
-
 func (s *Server) broadcastJSON(data interface{}) {
 	json, err := json.Marshal(data)
 	if err != nil {
@@ -181,10 +149,9 @@ func NewServer(taskManager *TaskManager, webRoot string) *Server {
 		WriteBufferSize: 1024,
 		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
-	wsConns := make(map[*websocket.Conn]bool)
 	wsHub := newHub()
 	go wsHub.run()
-	s := Server{router, taskManager, upgrader, wsConns, wsHub}
+	s := Server{router, taskManager, upgrader, wsHub}
 
 	api := router.Group(nil)
 	api.Use(middleware.Logger)
