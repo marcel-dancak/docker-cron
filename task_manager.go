@@ -240,45 +240,57 @@ func (m *TaskManager) runDockerCommand(logger Logger, conf runTask) (int, error)
 	return int(status), nil
 }
 
-func (m *TaskManager) execDockerCommand(logger Logger, conf execTask) (int, error) {
+func (m *TaskManager) getServiceContainers(name string) ([]types.Container, error) {
+	list := make([]types.Container, 0)
 	query := filters.NewArgs()
 	query.Add("status", "running")
 	containers, err := m.Cli.ContainerList(m.Ctx, types.ContainerListOptions{Filters: query})
 	if err != nil {
-		return -1, err
+		return list, err
 	}
-	prefix := fmt.Sprintf("/%s", m.containerName(conf.Service))
+	prefix := fmt.Sprintf("/%s", m.containerName(name))
 	for _, container := range containers {
 		if strings.HasPrefix(container.Names[0], prefix) {
-			config := types.ExecConfig{
-				User:         conf.User,
-				Cmd:          conf.Command,
-				AttachStdout: true,
-				AttachStderr: true,
-				Tty:          false,
-				// Detach:       false,
-			}
-			resp, err := m.Cli.ContainerExecCreate(m.Ctx, container.ID, config)
-			if err != nil {
-				return -1, err
-			}
-			atinfo, err := m.Cli.ContainerExecAttach(m.Ctx, resp.ID, config)
-			if err != nil {
-				return -1, err
-			}
-			defer atinfo.Close()
-			if err := m.Cli.ContainerExecStart(m.Ctx, resp.ID, types.ExecStartCheck{}); err != nil {
-				return -1, err
-			}
-			if _, err := stdcopy.StdCopy(logger.StdoutWriter(), logger.StderrWriter(), atinfo.Reader); err != nil {
-				log.Printf("Failed to log task output: %s\n", err)
-			}
-			inspect, err := m.Cli.ContainerExecInspect(m.Ctx, resp.ID)
-			if err != nil {
-				return -1, err
-			}
-			return inspect.ExitCode, nil
+			list = append(list, container)
 		}
+	}
+	return list, nil
+}
+
+func (m *TaskManager) execDockerCommand(logger Logger, conf execTask) (int, error) {
+	containers, err := m.getServiceContainers(conf.Service)
+	if err != nil {
+		return -1, err
+	}
+	for _, container := range containers {
+		config := types.ExecConfig{
+			User:         conf.User,
+			Cmd:          conf.Command,
+			AttachStdout: true,
+			AttachStderr: true,
+			Tty:          false,
+			// Detach:       false,
+		}
+		resp, err := m.Cli.ContainerExecCreate(m.Ctx, container.ID, config)
+		if err != nil {
+			return -1, err
+		}
+		atinfo, err := m.Cli.ContainerExecAttach(m.Ctx, resp.ID, config)
+		if err != nil {
+			return -1, err
+		}
+		defer atinfo.Close()
+		if err := m.Cli.ContainerExecStart(m.Ctx, resp.ID, types.ExecStartCheck{}); err != nil {
+			return -1, err
+		}
+		if _, err := stdcopy.StdCopy(logger.StdoutWriter(), logger.StderrWriter(), atinfo.Reader); err != nil {
+			log.Printf("Failed to log task output: %s\n", err)
+		}
+		inspect, err := m.Cli.ContainerExecInspect(m.Ctx, resp.ID)
+		if err != nil {
+			return -1, err
+		}
+		return inspect.ExitCode, nil
 	}
 	return -1, fmt.Errorf("Running service not found: %s", conf.Service)
 }

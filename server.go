@@ -117,6 +117,29 @@ func (s *Server) handleTaskLogs(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, logfile)
 }
 
+func (s *Server) handleKillService(w http.ResponseWriter, r *http.Request) {
+	service := chi.URLParam(r, "service")
+	signal := r.URL.Query().Get("signal")
+	tm := s.taskManager
+	containers, err := tm.getServiceContainers(service)
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+	if len(containers) == 0 {
+		http.Error(w, "Service not found", http.StatusNotFound)
+		return
+	}
+	for _, container := range containers {
+		if err := tm.Cli.ContainerKill(tm.Ctx, container.ID, signal); err != nil {
+			log.Printf(`Failed to send signal to service "%s": %s\n`, service, err)
+			http.Error(w, "Server error", http.StatusInternalServerError)
+			return
+		}
+	}
+	fmt.Fprintf(w, "ok\n")
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// strip trailing slash for API endpoints
 	if strings.HasPrefix(r.URL.Path, "/api/") {
@@ -167,6 +190,7 @@ func NewServer(taskManager *TaskManager, webRoot string) *Server {
 	api.Use(middleware.Logger)
 	api.HandleFunc("/api/tasks", s.handleTasksInfo)
 	api.Post("/api/run/{task}", s.handleTaskRun)
+	api.Post("/api/services/kill/{service}", s.handleKillService)
 	api.HandleFunc("/api/logs/{task}/{id:[0-9]+}", s.handleTaskLogs)
 	api.HandleFunc("/ws", s.handleWs)
 	router.Handle("/ui/*", http.StripPrefix("/ui/", http.FileServer(http.Dir(webRoot))))
