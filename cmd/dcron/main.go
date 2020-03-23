@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/marcel-dancak/dcron"
@@ -21,47 +22,41 @@ func optEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func parseConfig(path string) (*dcron.TasksConfig, error) {
+func parseConfig(path string) (dcron.TasksConfig, error) {
 	config := dcron.TasksConfig{}
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		log.Printf("[CRON] Failed to parse config file: %s\n", path)
-		return nil, err
+		return config, err
 	}
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, err
+		return config, err
 	}
-	return &config, nil
+	return config, nil
 }
 
 func main() {
 	configPath := flag.String("f", os.Getenv("DCRON_CONFIG_FILE"), "tasks configuration file")
-	projectName := flag.String("project", os.Getenv("COMPOSE_PROJECT_NAME"), "Docker Compose project's name")
+	// projectName := flag.String("project", os.Getenv("DCRON_COMPOSE_PROJECT"), "Docker Compose project's name")
 	flag.Parse()
 	if *configPath == "" {
 		log.Fatal("Config file not specified!")
 	}
 
-	config := dcron.TasksConfig{}
-	data, err := ioutil.ReadFile(*configPath)
+	config, err := parseConfig(*configPath)
 	if err != nil {
 		log.Printf("[CRON] Failed to parse config file: %s\n", *configPath)
 		log.Fatal(err)
 	}
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		log.Fatal(err)
+
+	projectName := os.Getenv("DCRON_COMPOSE_PROJECT")
+	if projectName == "" {
+		log.Fatal("Docker Compose project's name not specified!")
 	}
-	logsDir := optEnv("DCRON_LOGS_ROOT", "/var/log/dcron")
-	tm, err := dcron.NewTaskManager(config, os.Getenv("DCRON_COMPOSE_PROJECT"), logsDir)
+	logsDir := filepath.Join(optEnv("DCRON_LOGS_ROOT", "/var/log/dcron"), projectName)
+	tm, err := dcron.NewTaskManager(config, projectName, logsDir)
 	if err != nil {
 		log.Println("Failed to initialize Task Manager")
 		log.Fatal(err)
-	}
-	if *projectName != "" {
-		tm.ProjectName = *projectName
-	}
-	if tm.ProjectName == "" {
-		log.Fatal("Docker Compose project's name not specified!")
 	}
 
 	tm.Start()
@@ -72,6 +67,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer watcher.Close()
+
 	go func() {
 		for {
 			select {
@@ -79,15 +75,15 @@ func main() {
 				if !ok {
 					return
 				}
-				log.Println("event:", event)
 				if event.Op&fsnotify.Write == fsnotify.Write {
-					log.Println("modified file:", event.Name)
+					log.Println("Reloading configuration file:", event.Name)
 					conf, err := parseConfig(*configPath)
 					if err != nil {
+						log.Printf("[CRON] Failed to parse config file: %s\n", *configPath)
 						log.Println(err)
 					} else {
 						tm.Stop()
-						tm.LoadConfig(*conf)
+						tm.LoadConfig(conf)
 						tm.Start()
 					}
 				}
