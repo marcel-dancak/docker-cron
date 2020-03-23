@@ -17,7 +17,7 @@ const router = mobile ? require('./router/mobile').default : require('./router')
 
 Vue.config.productionTip = false
 Vue.prototype.$http = http
-Vue.prototype.$ws = WebsocketConnection(`ws://${location.host}/ws/`)
+Vue.prototype.$ws = WebsocketConnection(`ws://${location.host}/ws`)
 
 // Vue.filter('datetime', v => new Date(v).toLocaleString())
 Vue.filter('datetime', v => format(parseISO(v), 'dd.MM.yyyy HH:mm'))

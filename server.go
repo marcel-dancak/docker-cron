@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -23,8 +24,8 @@ type Server struct {
 
 type taskInfo struct {
 	Name     string      `json:"name"`
-	Schedule string      `json:"schedule"`
-	Next     time.Time   `json:"next"`
+	Schedule string      `json:"schedule,omitempty"`
+	Next     *time.Time  `json:"next,omitempty"`
 	Stats    []TaskStats `json:"stats"`
 }
 
@@ -52,7 +53,6 @@ func (s *Server) handleWs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getTaskInfo(task *Task) taskInfo {
-	entry := s.taskManager.Cron.Entry(task.EntryID)
 	s.taskManager.Stats.RLock()
 	stats := s.taskManager.Stats.Tasks[task.Name]
 	copy := make([]TaskStats, len(stats))
@@ -60,10 +60,16 @@ func (s *Server) getTaskInfo(task *Task) taskInfo {
 		copy[i] = *value
 	}
 	s.taskManager.Stats.RUnlock()
+
+	var next *time.Time
+	if task.Schedule != "" {
+		entry := s.taskManager.Cron.Entry(task.EntryID)
+		next = &entry.Next
+	}
 	return taskInfo{
 		task.Name,
 		task.Schedule,
-		entry.Next,
+		next,
 		copy,
 	}
 }
@@ -112,6 +118,10 @@ func (s *Server) handleTaskLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// strip trailing slash for API endpoints
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
+	}
 	s.router.ServeHTTP(w, r)
 }
 
@@ -155,10 +165,10 @@ func NewServer(taskManager *TaskManager, webRoot string) *Server {
 
 	api := router.Group(nil)
 	api.Use(middleware.Logger)
-	api.HandleFunc("/api/tasks/", s.handleTasksInfo)
+	api.HandleFunc("/api/tasks", s.handleTasksInfo)
 	api.Post("/api/run/{task}", s.handleTaskRun)
 	api.HandleFunc("/api/logs/{task}/{id:[0-9]+}", s.handleTaskLogs)
-	api.HandleFunc("/ws/", s.handleWs2)
+	api.HandleFunc("/ws", s.handleWs)
 	router.Handle("/ui/*", http.StripPrefix("/ui/", http.FileServer(http.Dir(webRoot))))
 
 	s.taskManager.AddTaskStartedListener(s.taskStarted)
