@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/marcel-dancak/dcron"
@@ -69,6 +70,7 @@ func main() {
 	defer watcher.Close()
 
 	go func() {
+		pendingReload := false
 		for {
 			select {
 			case event, ok := <-watcher.Events:
@@ -76,15 +78,21 @@ func main() {
 					return
 				}
 				if event.Op&fsnotify.Write == fsnotify.Write {
-					log.Println("Reloading configuration file:", event.Name)
-					conf, err := parseConfig(*configPath)
-					if err != nil {
-						log.Printf("[CRON] Failed to parse config file: %s\n", *configPath)
-						log.Println(err)
-					} else {
-						tm.Stop()
-						tm.LoadConfig(conf)
-						tm.Start()
+					if !pendingReload {
+						pendingReload = true
+						time.AfterFunc(1*time.Second, func() {
+							log.Println("Reloading configuration file:", event.Name)
+							conf, err := parseConfig(*configPath)
+							if err != nil {
+								log.Printf("[CRON] Failed to parse config file: %s\n", *configPath)
+								log.Println(err)
+							} else {
+								tm.Stop()
+								tm.LoadConfig(conf)
+								tm.Start()
+							}
+							pendingReload = false
+						})
 					}
 				}
 			case err, ok := <-watcher.Errors:
