@@ -76,6 +76,9 @@ export default {
 //   transition: all 1.5s ease;
 //   overflow: hidden;
 // }
+.v-application--wrap {
+  background-color: #e0e0e0;
+}
 </style>
 
 <style lang="scss" scoped>

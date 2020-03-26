@@ -1,5 +1,5 @@
 <template>
-  <v-layout class="column page px-1 py-1 grey lighten-2">
+  <v-layout class="column page px-1 py-1">
     <task-info
       v-for="t in tasksList"
       :key="t.name"

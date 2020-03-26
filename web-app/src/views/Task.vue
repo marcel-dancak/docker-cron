@@ -1,7 +1,7 @@
 <template>
   <v-layout
     v-if="task"
-    class="task-page column py-1 grey lighten-2"
+    class="task-page column py-1"
   >
     <task-card
       :task=task
