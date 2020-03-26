@@ -1,5 +1,5 @@
 <template>
-  <div class="card v-card">
+  <div class="card v-card theme--light">
     <v-layout
       class="header align-center px-3 grow blue-grey darken-3"
       @click="$router.push({ name: 'task', params: { name: task.name } })"
@@ -75,7 +75,6 @@ export default {
 .card {
   display: grid;
   grid-template-columns: 1fr auto;
-  background-color: #eee;;
 
   .header {
     grid-column: 1 / -1;

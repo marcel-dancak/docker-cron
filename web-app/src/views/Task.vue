@@ -1,7 +1,7 @@
 <template>
   <v-layout
     v-if="task"
-    class="task-page column my-1"
+    class="task-page column py-1 grey lighten-2"
   >
     <task-card
       :task=task
@@ -23,7 +23,7 @@
           <span class="text--secondary">No records</span>
         </v-list-item>
         <template v-for="run in stats">
-          <v-list-item :key="run.id">
+          <v-list-item :key="run.id" class="px-3">
             <div class="id mr-1 grey darken-2 text-center">
               <small class="white--text font-weight-medium">{{ run.id }}</small>
             </div>
@@ -57,7 +57,7 @@
           <v-expand-transition :key="`log-${run.id}`" class="py-2">
             <log-viewer
               v-if="openLogs[run.id] && fetchedLogs[run.id]"
-              class="logs text--secondary px-4"
+              class="logs text--secondary px-3"
               :logs="fetchedLogs[run.id]"
             />
           </v-expand-transition>
@@ -139,7 +139,10 @@ export default {
   }
 }
 .logs {
-  font-size: 14px;
+  font-size: 13px;
+  @media (max-width: 800px) {
+    font-size: 11px;
+  }
   // border-bottom: 1px solid #eee;
 }
 .id {

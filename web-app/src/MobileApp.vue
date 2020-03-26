@@ -36,9 +36,6 @@ export default {
 </script>
 
 <style lang="scss">
-.scrollable {
-  overflow: auto;
-}
 /* Slide from the left */
 .slide-enter-active, .slide-leave-active {
   transition: transform .4s cubic-bezier(.25,.8,.5,1);
