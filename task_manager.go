@@ -325,7 +325,7 @@ func (m *TaskManager) isTaskRunning(task string) bool {
 // RunTask execute task
 func (m *TaskManager) RunTask(task *Task) {
 	startTime := time.Now()
-	log.Println("[CRON] RunTask:", task.Name)
+	log.Printf("[CRON] (%s) Start\n", task.Name)
 	m.Stats.Lock()
 	statsEntry := &TaskStats{
 		StartTime: startTime,
@@ -360,8 +360,8 @@ func (m *TaskManager) RunTask(task *Task) {
 	status, err := task.Run(logger)
 	m.Stats.Lock()
 	if err != nil {
-		log.Printf("Task failed: %s\n", task.Name)
-		log.Println(err)
+		log.Printf("[CRON] (%s) Error: %s\n", task.Name, err)
+		fmt.Fprintf(logger.StderrWriter(), "[CRON] Error: %s\n", err)
 		statsEntry.Crashed = true
 	} else {
 		statsEntry.Status = status
@@ -372,7 +372,7 @@ func (m *TaskManager) RunTask(task *Task) {
 
 	statsEntry.Running = false
 	m.Stats.Unlock()
-	log.Println("Status:", status)
+	log.Printf("[CRON] (%s) Status: %d\n", task.Name, status)
 
 	go func() {
 		time.Sleep(50 * time.Millisecond)
