@@ -49,10 +49,11 @@ type baseTask struct {
 }
 
 type runTask struct {
-	baseTask   `yaml:",inline"`
-	Image      string   `yaml:"image"`
-	Volumes    []string `yaml:"volumes,flow"`
-	Entrypoint strSlice `yaml:"entrypoint"`
+	baseTask    `yaml:",inline"`
+	Image       string   `yaml:"image"`
+	Volumes     []string `yaml:"volumes,flow"`
+	NetworkMode string   `yaml:"network_mode"`
+	Entrypoint  strSlice `yaml:"entrypoint"`
 }
 
 type execTask struct {
@@ -213,7 +214,14 @@ func (m *TaskManager) runDockerCommand(logger Logger, conf runTask) (int, error)
 			binds = append(binds, m.containerName(item))
 		}
 	}
-	hostConfig := &container.HostConfig{Binds: binds}
+	network := conf.NetworkMode
+	if network == "" {
+		network = fmt.Sprintf("%s_default", m.ProjectName)
+	}
+	hostConfig := &container.HostConfig{
+		Binds:       binds,
+		NetworkMode: container.NetworkMode(network),
+	}
 	resp, err := m.Cli.ContainerCreate(m.Ctx, config, hostConfig, nil, "")
 	if err != nil {
 		return -1, err
