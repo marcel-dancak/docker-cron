@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -14,12 +15,17 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Server web server API and interface for task manager
+// Server web server API for task manager
 type Server struct {
 	router      *chi.Mux
 	taskManager *TaskManager
-	upgrader    websocket.Upgrader
-	hub         *Hub
+}
+
+// PublicServer web server with websocket connections
+type PublicServer struct {
+	Server
+	upgrader websocket.Upgrader
+	hub      *Hub
 }
 
 type taskInfo struct {
@@ -36,20 +42,6 @@ func (s *Server) jsonResponse(w http.ResponseWriter, data interface{}) {
 		log.Printf("Failed to serialize JSON: %s\n", err)
 		http.Error(w, "Server error", http.StatusInternalServerError)
 	}
-}
-
-func (s *Server) handleWs(w http.ResponseWriter, r *http.Request) {
-	conn, err := s.upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		http.Error(w, "WS connection failed", http.StatusInternalServerError)
-		return
-	}
-	client := &Client{hub: s.hub, conn: conn, send: make(chan []byte, 256)}
-	client.hub.register <- client
-
-	// Allow collection of memory referenced by the caller by doing all work in new goroutines.
-	go client.writePump()
 }
 
 func (s *Server) getTaskInfo(task *Task) taskInfo {
@@ -141,14 +133,31 @@ func (s *Server) handleKillService(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// strip trailing slash for API endpoints
-	if strings.HasPrefix(r.URL.Path, "/api/") {
+	// trailing slashes policy
+	// if r.URL.Path == "/ui" {
+	// 	r.URL.Path = "/ui/"
+	// }
+	if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/ws/") {
 		r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
 	}
 	s.router.ServeHTTP(w, r)
 }
 
-func (s *Server) broadcastJSON(data interface{}) {
+func (s *PublicServer) handleWs(w http.ResponseWriter, r *http.Request) {
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "WS connection failed", http.StatusInternalServerError)
+		return
+	}
+	client := &Client{hub: s.hub, conn: conn, send: make(chan []byte, 256)}
+	client.hub.register <- client
+
+	// Allow collection of memory referenced by the caller by doing all work in new goroutines.
+	go client.writePump()
+}
+
+func (s *PublicServer) broadcastJSON(data interface{}) {
 	json, err := json.Marshal(data)
 	if err != nil {
 		log.Println(err)
@@ -162,20 +171,40 @@ type taskNotificationMessage struct {
 	Task taskInfo `json:"task"`
 }
 
-func (s *Server) taskStarted(task *Task) {
+func (s *PublicServer) taskStarted(task *Task) {
 	taskInfo := s.getTaskInfo(task)
 	msg := taskNotificationMessage{"TaskStarted", taskInfo}
 	s.broadcastJSON(msg)
 }
 
-func (s *Server) taskFinished(task *Task) {
+func (s *PublicServer) taskFinished(task *Task) {
 	taskInfo := s.getTaskInfo(task)
 	msg := taskNotificationMessage{"TaskFinished", taskInfo}
 	s.broadcastJSON(msg)
 }
 
-// NewServer creates a new server
-func NewServer(taskManager *TaskManager, webRoot string) *Server {
+func indexHandler(webRoot string) func(w http.ResponseWriter, r *http.Request) {
+	indexHTML := filepath.Join(webRoot, "index.html")
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, indexHTML)
+	}
+}
+
+// NewServer creates a new API server
+func NewServer(taskManager *TaskManager) *Server {
+	router := chi.NewRouter()
+	s := Server{router, taskManager}
+	api := router.Group(nil)
+	api.Use(middleware.Logger)
+	api.HandleFunc("/api/tasks", s.handleTasksInfo)
+	api.Post("/api/run/{task}", s.handleTaskRun)
+	api.Post("/api/services/kill/{service}", s.handleKillService)
+	api.HandleFunc("/api/logs/{task}/{id:[0-9]+}", s.handleTaskLogs)
+	return &s
+}
+
+// NewPublicServer creates a new public server
+func NewPublicServer(taskManager *TaskManager, webRoot string) *PublicServer {
 	router := chi.NewRouter()
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -184,16 +213,22 @@ func NewServer(taskManager *TaskManager, webRoot string) *Server {
 	}
 	wsHub := newHub()
 	go wsHub.run()
-	s := Server{router, taskManager, upgrader, wsHub}
+	s := PublicServer{Server{router, taskManager}, upgrader, wsHub}
 
 	api := router.Group(nil)
 	api.Use(middleware.Logger)
 	api.HandleFunc("/api/tasks", s.handleTasksInfo)
 	api.Post("/api/run/{task}", s.handleTaskRun)
-	api.Post("/api/services/kill/{service}", s.handleKillService)
 	api.HandleFunc("/api/logs/{task}/{id:[0-9]+}", s.handleTaskLogs)
 	api.HandleFunc("/ws", s.handleWs)
-	router.Handle("/ui/*", http.StripPrefix("/ui/", http.FileServer(http.Dir(webRoot))))
+	router.Handle("/ui/static/*", http.StripPrefix("/ui/", http.FileServer(http.Dir(webRoot))))
+	router.HandleFunc("/ui", indexHandler(webRoot))
+	// for SPA with router in history mode
+	router.HandleFunc("/ui/*", indexHandler(webRoot))
+	// indexHTML := filepath.Join(webRoot, "index.html")
+	// router.HandleFunc("/ui/*", func(w http.ResponseWriter, r *http.Request) {
+	// 	http.ServeFile(w, r, indexHTML)
+	// })
 
 	s.taskManager.AddTaskStartedListener(s.taskStarted)
 	s.taskManager.AddTaskFinishedListener(s.taskFinished)

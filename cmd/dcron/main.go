@@ -1,13 +1,14 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -36,23 +37,21 @@ func parseConfig(path string) (dcron.TasksConfig, error) {
 }
 
 func main() {
-	configPath := flag.String("f", os.Getenv("DCRON_CONFIG_FILE"), "tasks configuration file")
-	// projectName := flag.String("project", os.Getenv("DCRON_COMPOSE_PROJECT"), "Docker Compose project's name")
-	flag.Parse()
-	if *configPath == "" {
+	configPath := os.Getenv("DCRON_CONFIG_FILE")
+	projectName := os.Getenv("DCRON_COMPOSE_PROJECT")
+	if configPath == "" {
 		log.Fatal("Config file not specified!")
 	}
-
-	config, err := parseConfig(*configPath)
-	if err != nil {
-		log.Printf("[CRON] Failed to parse config file: %s\n", *configPath)
-		log.Fatal(err)
-	}
-
-	projectName := os.Getenv("DCRON_COMPOSE_PROJECT")
 	if projectName == "" {
 		log.Fatal("Docker Compose project's name not specified!")
 	}
+
+	config, err := parseConfig(configPath)
+	if err != nil {
+		log.Printf("[CRON] Failed to parse config file: %s\n", configPath)
+		log.Fatal(err)
+	}
+
 	logsDir := filepath.Join(optEnv("DCRON_LOGS_ROOT", "/var/log/dcron"), projectName)
 	tm, err := dcron.NewTaskManager(config, projectName, logsDir)
 	if err != nil {
@@ -82,9 +81,9 @@ func main() {
 						pendingReload = true
 						time.AfterFunc(1*time.Second, func() {
 							log.Println("Reloading configuration file:", event.Name)
-							conf, err := parseConfig(*configPath)
+							conf, err := parseConfig(configPath)
 							if err != nil {
-								log.Printf("[CRON] Failed to parse config file: %s\n", *configPath)
+								log.Printf("[CRON] Failed to parse config file: %s\n", configPath)
 								log.Println(err)
 							} else {
 								tm.Stop()
@@ -103,20 +102,30 @@ func main() {
 			}
 		}
 	}()
-	watcher.Add(*configPath)
+	watcher.Add(configPath)
 
-	address := fmt.Sprintf(":%s", optEnv("DCRON_WEB_PORT", "8090"))
-	server := dcron.NewServer(tm, optEnv("DCRON_WEB_ROOT", "/var/www"))
-	// baseCtx := valv.Context()
-	// srv := http.Server{
-	// 	Addr: address,
-	// 	Handler: chi.ServerBaseContext(baseCtx, r),
-	// }
-	log.Fatal(http.ListenAndServe(address, server))
+	webPort, webServerConfigured := os.LookupEnv("DCRON_WEB_PORT")
+	if webServerConfigured {
+		webAddress := fmt.Sprintf(":%s", webPort)
+		publicServer := dcron.NewPublicServer(tm, optEnv("DCRON_WEB_ROOT", "/var/www"))
+		certFile, useSSL := os.LookupEnv("DCRON_SSL_CERT")
+		log.Println("[CRON] Starting public web server on port:", webPort)
+		if useSSL {
+			keyFile, _ := os.LookupEnv("DCRON_SSL_CERT_KEY")
+			go http.ListenAndServeTLS(webAddress, certFile, keyFile, publicServer)
+		} else {
+			go http.ListenAndServe(webAddress, publicServer)
+		}
+	}
 
-	// done := make(chan os.Signal, 1)
-	// signal.Notify(done, os.Interrupt, syscall.SIGTERM)
-	// <-done
+	apiServer := dcron.NewServer(tm)
+	apiPort := optEnv("DCRON_API_PORT", "7000")
+	log.Println("[CRON] Starting API server on port:", apiPort)
+	go http.ListenAndServe(fmt.Sprintf(":%s", apiPort), apiServer)
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGTERM)
+	<-done
 
 	tm.Stop()
 }
