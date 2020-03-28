@@ -112,16 +112,22 @@ func main() {
 		log.Println("[CRON] Starting public web server on port:", webPort)
 		if useSSL {
 			keyFile, _ := os.LookupEnv("DCRON_SSL_CERT_KEY")
-			go http.ListenAndServeTLS(webAddress, certFile, keyFile, publicServer)
+			go func() {
+				log.Fatal(http.ListenAndServeTLS(webAddress, certFile, keyFile, publicServer))
+			}()
 		} else {
-			go http.ListenAndServe(webAddress, publicServer)
+			go func() {
+				log.Fatal(http.ListenAndServe(webAddress, publicServer))
+			}()
 		}
 	}
 
 	apiServer := dcron.NewServer(tm)
 	apiPort := optEnv("DCRON_API_PORT", "7000")
 	log.Println("[CRON] Starting API server on port:", apiPort)
-	go http.ListenAndServe(fmt.Sprintf(":%s", apiPort), apiServer)
+	go func() {
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", apiPort), apiServer))
+	}()
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGTERM)
