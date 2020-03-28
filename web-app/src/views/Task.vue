@@ -27,8 +27,8 @@
             <div class="id mr-1 grey darken-2 text-center">
               <small class="white--text font-weight-medium">{{ run.id }}</small>
             </div>
-            <date-field :value="task.next" class="ml-2"/>
-            <time-field :value="task.next" class="ml-2"/>
+            <date-field :value="run.start_time" class="ml-2"/>
+            <time-field :value="run.start_time" class="ml-2"/>
 
             <v-spacer/>
             <v-progress-circular
