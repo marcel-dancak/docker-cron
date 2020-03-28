@@ -12,7 +12,6 @@
 ### docker-compose.yml
 ```yaml
 version: "2.3"
-
 services:
 
   postgres:
@@ -74,6 +73,7 @@ run:
       - letsencrypt:/etc/letsencrypt/
     command: ["renew", "--post-hook", "sh -c 'wget -qO- --post-data= http://dcron:7000/api/services/kill/nginx?signal=SIGHUP'"]
 
+exec:
   db-backup:
     schedule: "45 23 * * *"
     service: postgres
