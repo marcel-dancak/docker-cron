@@ -1,19 +1,15 @@
 import Vue from 'vue'
-// import DesktopApp from './App.vue'
-// import MobileApp from './MobileApp.vue'
+import DesktopApp from './App.vue'
+import MobileApp from './MobileApp.vue'
 import WebsocketConnection from './ws'
 import http from './http'
-// import router from './router'
+import routers from './router'
 import vuetify from './plugins/vuetify'
 import './global-components'
 import parseISO from 'date-fns/parseISO'
 import format from 'date-fns/format'
 
 const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent)
-// const App = mobile ? MobileApp : DesktopApp
-// const App = MobileApp
-const App = mobile ? require('./MobileApp.vue').default : require('./App.vue').default
-const router = mobile ? require('./router/mobile').default : require('./router').default
 
 Vue.config.productionTip = false
 Vue.prototype.$http = http
@@ -25,7 +21,7 @@ Vue.filter('date', v => v ? format(new Date(v), 'dd.MM.yyyy') : '-')
 Vue.filter('time', v => v ? format(new Date(v), 'HH:mm') : '-')
 
 new Vue({
-  router,
+  router: mobile ? routers.mobile : routers.desktop,
   vuetify,
   data () {
     return {
@@ -61,5 +57,5 @@ new Vue({
     //   })
     // }
   },
-  render: h => h(App)
+  render: h => h(mobile ? MobileApp : DesktopApp)
 }).$mount('#app')

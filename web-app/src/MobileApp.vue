@@ -31,53 +31,58 @@
 
 <script>
 export default {
-  name: 'App'
+  name: 'App',
+  mounted () {
+    document.body.parentElement.classList.add('mobile')
+  }
 }
 </script>
 
 <style lang="scss">
-/* Slide from the left */
-.slide-enter-active, .slide-leave-active {
-  transition: transform .4s cubic-bezier(.25,.8,.5,1);
-}
-.slide-enter, .slide-leave-to {
-  transform: translate3d(-100%, 0, 0);
-}
-.slide-enter-active, .slide-leave-active {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-.switch-enter, .switch-leave-to {
-  transform: translate(-30%, 0);
-  opacity: 0;
-}
-.switch-leave, .switch-enter-to {
-  transform: translate(0, 0);
-  opacity: 1;
-}
-.switch-enter-active, .switch-leave-active {
-  transition: all 0.5s ease;
-}
-.switch-enter-active, .switch-leave-active {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-}
+.mobile {
+  /* Slide from the left */
+  .slide-enter-active, .slide-leave-active {
+    transition: transform .4s cubic-bezier(.25,.8,.5,1);
+  }
+  .slide-enter, .slide-leave-to {
+    transform: translate3d(-100%, 0, 0);
+  }
+  .slide-enter-active, .slide-leave-active {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+  .switch-enter, .switch-leave-to {
+    transform: translate(-30%, 0);
+    opacity: 0;
+  }
+  .switch-leave, .switch-enter-to {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  .switch-enter-active, .switch-leave-active {
+    transition: all 0.5s ease;
+  }
+  .switch-enter-active, .switch-leave-active {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+  }
 
-.switch-container {
-  position: relative;
-}
-// .switch-active {
-//   will-change: height;
-//   transition: all 1.5s ease;
-//   overflow: hidden;
-// }
-.v-application--wrap {
-  background-color: #e0e0e0;
+  .switch-container {
+    position: relative;
+  }
+  // .switch-active {
+  //   will-change: height;
+  //   transition: all 1.5s ease;
+  //   overflow: hidden;
+  // }
+  .v-application--wrap {
+    background-color: #e0e0e0;
+  }
 }
 </style>
 

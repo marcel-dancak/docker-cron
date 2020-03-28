@@ -29,24 +29,29 @@
 <script>
 
 export default {
-  name: 'App'
+  name: 'App',
+  mounted () {
+    document.body.parentElement.classList.add('desktop')
+  }
 }
 </script>
 
 <style lang="scss">
-html, body, .v-application, .v-application--wrap {
-  overflow: hidden!important;
-  height: 100%;
+html.desktop {
+  &, body, .v-application, .v-application--wrap {
+    overflow: hidden!important;
+    height: 100%;
+  }
+  .scrollable {
+    overflow: auto;
+  }
+  // .v-application, .v-application--wrap {
+  //   overflow: hidden!important;
+  //   min-height: 0;
+  //   max-height: 90%;
+  //   height: 90vh;
+  // }
 }
-.scrollable {
-  overflow: auto;
-}
-// .v-application, .v-application--wrap {
-//   overflow: hidden!important;
-//   min-height: 0;
-//   max-height: 90%;
-//   height: 90vh;
-// }
 </style>
 
 <style lang="scss" scoped>
