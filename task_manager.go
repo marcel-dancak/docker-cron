@@ -208,7 +208,8 @@ func (m *TaskManager) runDockerCommand(logger Logger, conf runTask) (int, error)
 
 	binds := make([]string, 0)
 	for _, item := range conf.Volumes {
-		if strings.Contains(item, "/") {
+		src := strings.Split(item, ":")[0]
+		if strings.Contains(src, "/") {
 			binds = append(binds, item)
 		} else {
 			binds = append(binds, m.containerName(item))
