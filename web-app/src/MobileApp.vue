@@ -26,12 +26,16 @@
         <router-view/>
       <!-- </transition> -->
     <!-- </div> -->
+    <authentication/>
   </v-app>
 </template>
 
 <script>
+import Authentication from '@/components/Authentication.vue'
+
 export default {
   name: 'App',
+  components: { Authentication },
   mounted () {
     document.body.parentElement.classList.add('mobile')
   }

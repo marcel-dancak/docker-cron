@@ -13,9 +13,7 @@ const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userA
 
 Vue.config.productionTip = false
 Vue.prototype.$http = http
-Vue.prototype.$ws = WebsocketConnection(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
 
-// Vue.filter('datetime', v => new Date(v).toLocaleString())
 Vue.filter('datetime', v => format(parseISO(v), 'dd.MM.yyyy HH:mm'))
 Vue.filter('date', v => v ? format(new Date(v), 'dd.MM.yyyy') : '-')
 Vue.filter('time', v => v ? format(new Date(v), 'HH:mm') : '-')
@@ -28,10 +26,8 @@ new Vue({
       tasks: {}
     }
   },
-  created () {
-    this.fetchTasks()
-    this.$once('hook:beforeDestroy', this.$ws.bind('TaskStarted', this.onTaskStatusUpdated))
-    this.$once('hook:beforeDestroy', this.$ws.bind('TaskFinished', this.onTaskStatusUpdated))
+  mounted () {
+    this.init()
   },
   methods: {
     onTaskStatusUpdated (e) {
@@ -39,23 +35,16 @@ new Vue({
       const { task } = e
       this.tasks[task.name] = task
     },
+    async init () {
+      await this.fetchTasks()
+      Vue.prototype.$ws = WebsocketConnection(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
+      this.$once('hook:beforeDestroy', this.$ws.bind('TaskStarted', this.onTaskStatusUpdated))
+      this.$once('hook:beforeDestroy', this.$ws.bind('TaskFinished', this.onTaskStatusUpdated))
+    },
     async fetchTasks () {
-      try {
-        const { data } = await this.$http.get('/api/tasks/')
-        this.tasks = data
-      } catch (err) {
-        console.error(err)
-      }
+      const { data } = await this.$http.get('/api/tasks/')
+      this.tasks = data
     }
-    // fetchTasks () {
-    //   this.$http.get('/api/tasks/')
-    //   .then(resp => {
-    //     this.tasks = resp.data
-    //   })
-    //   .catch(err => {
-    //     console.error(err)
-    //   })
-    // }
   },
   render: h => h(mobile ? MobileApp : DesktopApp)
 }).$mount('#app')

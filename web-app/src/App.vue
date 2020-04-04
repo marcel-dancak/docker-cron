@@ -23,13 +23,16 @@
       </svg>
       <router-view class="app-content"/>
     </div>
+    <authentication/>
   </v-app>
 </template>
 
 <script>
+import Authentication from '@/components/Authentication.vue'
 
 export default {
   name: 'App',
+  components: { Authentication },
   mounted () {
     document.body.parentElement.classList.add('desktop')
   }
@@ -45,12 +48,6 @@ html.desktop {
   .scrollable {
     overflow: auto;
   }
-  // .v-application, .v-application--wrap {
-  //   overflow: hidden!important;
-  //   min-height: 0;
-  //   max-height: 90%;
-  //   height: 90vh;
-  // }
 }
 </style>
 
