@@ -204,7 +204,7 @@ func NewServer(taskManager *TaskManager) *Server {
 }
 
 // NewPublicServer creates a new public server
-func NewPublicServer(taskManager *TaskManager, webRoot string) *PublicServer {
+func NewPublicServer(taskManager *TaskManager, webRoot string, auth AuthBackend) *PublicServer {
 	router := chi.NewRouter()
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -217,6 +217,12 @@ func NewPublicServer(taskManager *TaskManager, webRoot string) *PublicServer {
 
 	api := router.Group(nil)
 	api.Use(middleware.Logger)
+
+	if auth != nil {
+		router.Post("/api/auth/login", auth.HandleLogin)
+		api.Use(auth.AuthMiddleware)
+	}
+
 	api.HandleFunc("/api/tasks", s.handleTasksInfo)
 	api.Post("/api/run/{task}", s.handleTaskRun)
 	api.HandleFunc("/api/logs/{task}/{id:[0-9]+}", s.handleTaskLogs)

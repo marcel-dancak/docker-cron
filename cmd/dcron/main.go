@@ -107,7 +107,13 @@ func main() {
 	webPort, webServerConfigured := os.LookupEnv("DCRON_WEB_PORT")
 	if webServerConfigured {
 		webAddress := fmt.Sprintf(":%s", webPort)
-		publicServer := dcron.NewPublicServer(tm, optEnv("DCRON_WEB_ROOT", "/var/www"))
+
+		var auth dcron.AuthBackend
+		authPass, _ := os.LookupEnv("DCRON_WEB_AUTH_PASSWORD")
+		if authPass != "" {
+			auth = dcron.NewAuthBackend(authPass, 1*time.Hour)
+		}
+		publicServer := dcron.NewPublicServer(tm, optEnv("DCRON_WEB_ROOT", "/var/www"), auth)
 		certFile, useSSL := os.LookupEnv("DCRON_SSL_CERT")
 		log.Println("[CRON] Starting public web server on port:", webPort)
 		if useSSL {
